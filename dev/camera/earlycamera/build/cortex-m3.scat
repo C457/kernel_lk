@@ -1,0 +1,28 @@
+ROM_LOAD 0x00000000
+{
+;   ROM_EXEC    0x00000000  0x7F00
+;Code area 0 ~ 0x8000, Data area 0x8000 ~ 0x10000	
+   ROM_EXEC    0x00000000  0x8000
+   {
+        init.o (Init, +First)
+		;* (+RO,+RW, +ZI)
+		* (+RO)
+   }
+;   IRAM        0x00008000
+   IRAM        0x00009000
+   {
+       	* (+RW,+ZI)
+   }
+   
+;   HEAP        0x0000FE00  UNINIT 0x100
+   HEAP        0x00008800  UNINIT 0x100
+   {
+   		heap.o (+ZI)
+   }
+
+;   STACKS      0x0000FF00 UNINIT 0x100
+   STACKS      0x00008900 UNINIT 0x40
+   {
+   		stack.o (+ZI)
+   }
+}

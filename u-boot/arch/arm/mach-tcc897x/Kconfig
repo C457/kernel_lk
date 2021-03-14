@@ -1,0 +1,53 @@
+if ARCH_TELECHIPS
+
+config TCC897X
+	bool
+	default y
+
+config SYS_SOC
+	default "tcc897x"
+
+config DAUDIO_KK
+	bool
+	default y
+
+choice
+	prompt "Telechips Board select"
+	optional
+
+config TCC8971_EVB
+	bool "TCC8971 EVB Evaluation Board"
+
+config TCC8971_LCN
+	bool "TCC8971 LCN Evaluation Board"
+
+endchoice
+
+
+choice
+    prompt "Boot Dev select"
+    default TCC_BOOT_EMMC
+    help
+     Telechips EVM Select Boot device
+
+config TCC_BOOT_EMMC
+    bool "eMMC"
+    select BOOT_EMMC
+
+config TCC_BOOT_SNOR
+    bool "Serial NOR flash"
+    select BOOT_SNOR
+
+config TCC_BOOT_NAND
+    bool "NAND flash"
+    select BOOT_NAND
+
+endchoice
+
+
+source "board/telechips/tcc897x_evb/Kconfig"
+source "board/telechips/tcc897x_lcn/Kconfig"
+
+endif
+
+
