@@ -61,7 +61,9 @@ static unsigned int		FGCOLOR;
 
 static void fbcon_flush(void)
 {
-	/* Nothing to do */
+
+	flush_dcache_range((u32)fb_config.base, (u32)(fb_config.base + (fb_config.width * fb_config.height * fb_config.bpp)));
+
 }
 
 static void fbcon_drawglyph(unsigned int *pixels, unsigned int paint,
@@ -159,8 +161,8 @@ static int fbcon_setup(struct fbcon_config *_config)
 
 	switch (config->format) {
 	case FB_FORMAT_RGB565:
-		bg = RGB565_BLACK;
-		fg = RGB565_WHITE;
+		bg = RGB565_WHITE;
+		fg = RGB565_BLACK;
 		break;
 	default:
 		printf("unknown framebuffer pixel format\n");
@@ -236,6 +238,7 @@ int fbcon_printf(const char *str)
 	while (*str != 0)
 		fbcon_putc(*str++);
 
+	fbcon_flush();
 	return 0;
 }
 

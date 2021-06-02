@@ -48,7 +48,7 @@
  */
 #define UPDATE_FILE_NAME				"update.fai"		/* Just support the only "SD Data.fai" type file*/
 #define UPDATE_BUFFER_ADDR				"F0000000"
-#define UPDATE_BUFFER_SIZE				(100*1024*1024)
+#define UPDATE_BUFFER_SIZE				(16*1024*1024)
 #define UPDATE_BOOTLOADER_NAME          "lk.rom"
 #define UPDATE_BOOTLOADER_DEFAULT_SIZE  (10*1024*1024)
 #if defined(CONFIG_FBCON)
