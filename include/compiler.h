@@ -1,125 +1,144 @@
 /*
- * Copyright (c) 2008 Travis Geiselbrecht
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files
- * (the "Software"), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge,
- * publish, distribute, sublicense, and/or sell copies of the Software,
- * and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * Keep all the ugly #ifdef for system stuff here
  */
-#ifndef __COMPILER_H
-#define __COMPILER_H
 
-#ifndef __ASSEMBLY__
+#ifndef __COMPILER_H__
+#define __COMPILER_H__
 
-#if __GNUC__
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-#define __UNUSED __attribute__((__unused__))
-#define __PACKED __attribute__((packed))
-#define __ALIGNED(x) __attribute__((aligned(x)))
-#define __PRINTFLIKE(__fmt,__varargs) __attribute__((__format__ (__printf__, __fmt, __varargs)))
-#define __SCANFLIKE(__fmt,__varargs) __attribute__((__format__ (__scanf__, __fmt, __varargs)))
-#define __SECTION(x) __attribute((section(x)))
-#define __PURE __attribute((pure))
-#define __CONST __attribute((const))
-#define __NO_RETURN __attribute__((noreturn)) 
-#define __MALLOC __attribute__((malloc))
-#define __WEAK __attribute__((weak))
-#define __GNU_INLINE __attribute__((gnu_inline))
-#define __GET_CALLER(x) __builtin_return_address(0)
-#define __GET_FRAME(x) __builtin_frame_address(0)
+#include <stddef.h>
 
-#define INCBIN(symname, sizename, filename, section)					\
-	__asm__ (".section " section "; .align 4; .globl "#symname);		\
-	__asm__ (""#symname ":\n.incbin \"" filename "\"");					\
-	__asm__ (".section " section "; .align 1;");						\
-	__asm__ (""#symname "_end:");										\
-	__asm__ (".section " section "; .align 4; .globl "#sizename);		\
-	__asm__ (""#sizename ": .long "#symname "_end - "#symname " - 1");	\
-	extern unsigned char symname[];										\
-	extern unsigned int sizename
+#ifdef USE_HOSTCC
 
-#define INCFILE(symname, sizename, filename) INCBIN(symname, sizename, filename, ".rodata")
+#if defined(__BEOS__)	 || \
+    defined(__NetBSD__)  || \
+    defined(__FreeBSD__) || \
+    defined(__sun__)	 || \
+    defined(__APPLE__)
+# include <inttypes.h>
+#elif defined(__linux__) || defined(__WIN32__) || defined(__MINGW32__)
+# include <stdint.h>
+#endif
 
-/* look for gcc 3.0 and above */
-#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 0)
-#define __ALWAYS_INLINE __attribute__((always_inline))
+#include <errno.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#if !defined(__WIN32__) && !defined(__MINGW32__)
+# include <sys/mman.h>
+#endif
+
+/* Not all systems (like Windows) has this define, and yes
+ * we do replace/emulate mmap() on those systems ...
+ */
+#ifndef MAP_FAILED
+# define MAP_FAILED ((void *)-1)
+#endif
+
+#include <fcntl.h>
+#ifndef O_BINARY		/* should be define'd on __WIN32__ */
+#define O_BINARY	0
+#endif
+
+#ifdef __linux__
+# include <endian.h>
+# include <byteswap.h>
+#elif defined(__MACH__) || defined(__FreeBSD__)
+# include <machine/endian.h>
+typedef unsigned long ulong;
+#endif
+#ifdef __FreeBSD__
+# include <sys/endian.h> /* htole32 and friends */
+#endif
+
+#include <time.h>
+
+typedef uint8_t __u8;
+typedef uint16_t __u16;
+typedef uint32_t __u32;
+typedef unsigned int uint;
+
+#define uswap_16(x) \
+	((((x) & 0xff00) >> 8) | \
+	 (((x) & 0x00ff) << 8))
+#define uswap_32(x) \
+	((((x) & 0xff000000) >> 24) | \
+	 (((x) & 0x00ff0000) >>  8) | \
+	 (((x) & 0x0000ff00) <<  8) | \
+	 (((x) & 0x000000ff) << 24))
+#define _uswap_64(x, sfx) \
+	((((x) & 0xff00000000000000##sfx) >> 56) | \
+	 (((x) & 0x00ff000000000000##sfx) >> 40) | \
+	 (((x) & 0x0000ff0000000000##sfx) >> 24) | \
+	 (((x) & 0x000000ff00000000##sfx) >>  8) | \
+	 (((x) & 0x00000000ff000000##sfx) <<  8) | \
+	 (((x) & 0x0000000000ff0000##sfx) << 24) | \
+	 (((x) & 0x000000000000ff00##sfx) << 40) | \
+	 (((x) & 0x00000000000000ff##sfx) << 56))
+#if defined(__GNUC__)
+# define uswap_64(x) _uswap_64(x, ull)
 #else
-#define __ALWAYS_INLINE
+# define uswap_64(x) _uswap_64(x, )
 #endif
 
-/* look for gcc 3.1 and above */
-#if !defined(__DEPRECATED) // seems to be built in in some versions of the compiler
-#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
-#define __DEPRECATED __attribute((deprecated))
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+# define cpu_to_le16(x)		(x)
+# define cpu_to_le32(x)		(x)
+# define cpu_to_le64(x)		(x)
+# define le16_to_cpu(x)		(x)
+# define le32_to_cpu(x)		(x)
+# define le64_to_cpu(x)		(x)
+# define cpu_to_be16(x)		uswap_16(x)
+# define cpu_to_be32(x)		uswap_32(x)
+# define cpu_to_be64(x)		uswap_64(x)
+# define be16_to_cpu(x)		uswap_16(x)
+# define be32_to_cpu(x)		uswap_32(x)
+# define be64_to_cpu(x)		uswap_64(x)
 #else
-#define __DEPRECATED
-#endif
+# define cpu_to_le16(x)		uswap_16(x)
+# define cpu_to_le32(x)		uswap_32(x)
+# define cpu_to_le64(x)		uswap_64(x)
+# define le16_to_cpu(x)		uswap_16(x)
+# define le32_to_cpu(x)		uswap_32(x)
+# define le64_to_cpu(x)		uswap_64(x)
+# define cpu_to_be16(x)		(x)
+# define cpu_to_be32(x)		(x)
+# define cpu_to_be64(x)		(x)
+# define be16_to_cpu(x)		(x)
+# define be32_to_cpu(x)		(x)
+# define be64_to_cpu(x)		(x)
 #endif
 
-/* look for gcc 3.3 and above */
-#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3)
-/* the may_alias attribute was introduced in gcc 3.3; before that, there
- * was no way to specify aliasiang rules on a type-by-type basis */
-#define __MAY_ALIAS __attribute__((may_alias)) 
+#else /* !USE_HOSTCC */
 
-/* nonnull was added in gcc 3.3 as well */
-#define __NONNULL(x) __attribute((nonnull x))
+#ifdef CONFIG_USE_STDINT
+/* Provided by gcc. */
+#include <stdint.h>
 #else
-#define __MAY_ALIAS
-#define __NONNULL(x)
+/* Type for `void *' pointers. */
+typedef unsigned long int uintptr_t;
 #endif
 
-/* look for gcc 3.4 and above */
-#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
-#define __WARN_UNUSED_RESULT __attribute((warn_unused_result))
+#include <linux/string.h>
+#include <linux/types.h>
+#include <asm/byteorder.h>
+
+#if __SIZEOF_LONG__ == 8
+# define __WORDSIZE	64
+#elif __SIZEOF_LONG__ == 4
+# define __WORDSIZE	32
 #else
-#define __WARN_UNUSED_RESULT
+/*
+ * Assume 32-bit for now - only newer toolchains support this feature and
+ * this is only required for sandbox support at present.
+ */
+#define __WORDSIZE	32
 #endif
 
-#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 1)
-#define __EXTERNALLY_VISIBLE __attribute__((externally_visible))
-#else
-#define __EXTERNALLY_VISIBLE
-#endif
+#endif /* USE_HOSTCC */
 
-#else
-
-#define likely(x)       (x)
-#define unlikely(x)     (x)
-#define __UNUSED 
-#define __PACKED 
-#define __ALIGNED(x)
-#define __PRINTFLIKE(__fmt,__varargs)
-#define __SCANFLIKE(__fmt,__varargs)
-#define __SECTION(x)
-#define __PURE
-#define __CONST
-#define __NONNULL(x)
-#define __DEPRECATED
-#define __WARN_UNUSED_RESULT
-#define __ALWAYS_INLINE
-#define __MAY_ALIAS
-#define __NO_RETURN
-#endif
-
-#endif
-
-/* TODO: add type check */
-#define countof(a) (sizeof(a) / sizeof((a)[0]))
+#define likely(x)	__builtin_expect(!!(x), 1)
+#define unlikely(x)	__builtin_expect(!!(x), 0)
 
 #endif
