@@ -6,7 +6,7 @@
 #
 
 obj-$(CONFIG_USB_DWC_OTG) += otgcore.o otgdev_io.o
-#obj-$(CONFIG_FWDN_V7) += fastbootusb.o
+obj-$(CONFIG_FWDN_V7) += fastbootusb.o
 obj-$(CONFIG_FWDN_V7) += hsusb.o
 obj-$(CONFIG_FWDN_V7) += usb_device.o
 obj-$(CONFIG_FWDN_V7) += usb_manager.o
