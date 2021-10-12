@@ -1,0 +1,16 @@
+if TCC8971_LCN
+
+config SYS_BOARD
+	default "tcc897x_lcn"
+
+config SYS_VENDOR
+	default "telechips"
+
+config SYS_CONFIG_NAME
+	default "tcc8971-lcn"
+
+config FBCON
+	bool "Support for fb console"
+	default n
+
+endif

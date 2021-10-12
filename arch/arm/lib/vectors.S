@@ -15,15 +15,10 @@
 
 #include <config.h>
 
-/*
- *************************************************************************
- *
- * Symbol _start is referenced elsewhere, so make it global
- *
- *************************************************************************
- */
 
-.globl _start
+#ifdef CONFIG_ARCH_TELECHIPS
+
+.globl	_tcc_start
 
 /*
  *************************************************************************
@@ -34,6 +29,96 @@
  */
 
 	.section ".vectors", "ax"
+
+_tcc_start:
+	b _start
+/*
+ *************************************************************************
+ *
+ * Telechips Board Specific Date
+ *
+ *************************************************************************
+ */
+
+	.word	0xFFFF0106		/* Hardware ID */
+.globl FirmwareVersion
+FirmwareVersion:
+	.word	0x3A726556		/* Ver: */
+	.word	0x34333231		/* 1234 */
+FirmwareCheckSum:
+	.word	0x00000000		/* Firmware CRC32 Value Untile 128Kbytes */
+DACVersion:
+	.word	0x00000000		/* Not Used Area - Reserved */
+FirmwareCheckSumEnd:
+	.word	0x00000000		/* Firmware CRC32 Value From 128Kbytes to End */
+FirmwareSize:
+	.word	0x00000000		/* Firmware Total Size */
+SerialNumber:
+	.word	0x00000000		/* SN[3:0]	*/
+	.word	0x00000000		/* SN[7:4]	*/
+	.word	0x00000000		/* SN[11:8]	*/	
+	.word	0x00000000		/* SN[15:12]	*/
+	.word	0x00000000		/* SN[19:16]	*/
+	.word	0x00000000		/* SN[23:20]	*/
+	.word	0x00000000		/* SN[27:24]	*/
+	.word	0x00000000		/* SN[31:28]	*/
+	.word	0x00000000		/* SN[35:32]	*/
+	.word	0x00000000		/* SN[39:36]	*/
+	.word	0x00000000		/* SN[43:40]	*/
+	.word	0x00000000		/* SN[47:44]	*/
+	.word	0x00000000		/* SN[51:48]	*/
+	.word	0x00000000		/* SN[55:52]	*/
+	.word	0x00000000		/* SN[59:56]	*/
+	.word	0x00000000		/* SN[63:60]	*/
+
+.globl FirmwareBaseAddress
+FirmwareBaseAddress:
+	.word _tcc_start		/* Base Address */
+	.word 0x00000000		/* Reserved for Telechips */
+
+#ifdef FWDN_V7
+	.word 0x20203756		/* "V7  " */
+#else
+	.word 0x544F4F42		/* "BOOT" */
+#endif
+
+#ifdef CONFIG_TCC897X
+	.word 0x58373938		/* "897X" */
+#else
+	.word 0x00000000		/* NOT SUPPORT */
+#endif
+
+.globl	InitRoutine_StartBase
+InitRoutine_StartBase:
+	.word	InitRoutine_Start
+
+.globl	InitRoutine_StartLimit
+InitRoutine_StartLimit:
+	 .word	InitRoutine_End
+
+
+#endif
+/*
+ *************************************************************************
+ *
+ * Symbol _start is referenced elsewhere, so make it global
+ *
+ *************************************************************************
+ */
+
+.globl _start
+
+#ifndef CONFIG_ARCH_TELECHIPS
+/*
+ *************************************************************************
+ *
+ * Vectors have their own section so linker script can map them easily
+ *
+ *************************************************************************
+ */
+
+	.section ".vectors", "ax"
+#endif
 
 /*
  *************************************************************************

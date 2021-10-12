@@ -680,7 +680,7 @@ static int booti_setup(bootm_headers_t *images)
 
 		src = (void *)images->ep;
 		images->ep = dst;
-		memmove((void *)dst, src, le32_to_cpu(ih->image_size));
+		memmove((void *)(uintptr_t)dst, src, le32_to_cpu(ih->image_size));
 	}
 
 	return 0;

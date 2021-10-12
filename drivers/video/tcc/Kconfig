@@ -1,0 +1,11 @@
+config LCD_AT070TN93
+	bool "INNOLUX AT070TN93 LCD support"
+	depends on ARCH_TELECHIPS
+
+config LCD_ED090NA
+	bool "ED090NA: CHIMEI INNOLUX 1280 * 800 LVDS support"
+	depends on ARCH_TELECHIPS
+
+config LCD_FLD0800
+	bool "FLD0800: 1024 * 600 LVDS support"
+	depends on ARCH_TELECHIPS

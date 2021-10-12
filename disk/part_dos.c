@@ -93,7 +93,7 @@ int test_part_dos (block_dev_desc_t *dev_desc)
 	if (dev_desc->block_read(dev_desc->dev, 0, 1, (ulong *) buffer) != 1)
 		return -1;
 
-	if (test_block_type(buffer) != DOS_MBR)
+	if (test_block_type(buffer) != DOS_MBR && test_block_type(buffer) != DOS_PBR)
 		return -1;
 
 	return 0;

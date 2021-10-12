@@ -27,3 +27,6 @@ obj-$(CONFIG_POWER_TPS65218) += pmic_tps62362.o
 obj-$(CONFIG_POWER_TPS65218) += pmic_tps65218.o
 obj-$(CONFIG_POWER_TPS65910) += pmic_tps65910.o
 obj-$(CONFIG_POWER_HI6553) += pmic_hi6553.o
+obj-$(CONFIG_POWER_DA9062) += pmic_da9062.o
+obj-$(CONFIG_POWER_RT5028) += pmic_rt5028.o
+obj-$(CONFIG_POWER_DAUDIOKK_PFUZE100) += pmic_daudiokk_pfuze100.o

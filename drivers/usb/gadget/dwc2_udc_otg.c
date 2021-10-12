@@ -423,6 +423,10 @@ static void reconfig_usbd(struct dwc2_udc *dev)
 
 	writel(dflt_gusbcfg, &reg->gusbcfg);
 
+#ifdef CONFIG_TCC
+	writel(0x0FC01000, &reg->gdfifocfg);
+#endif
+
 	/* 3. Put the OTG device core in the disconnected state.*/
 	uTemp = readl(&reg->dctl);
 	uTemp |= SOFT_DISCONNECT;
@@ -557,8 +561,8 @@ static int dwc2_ep_enable(struct usb_ep *_ep,
 	}
 
 	/* hardware _could_ do smaller, but driver doesn't */
-	if ((desc->bmAttributes == USB_ENDPOINT_XFER_BULK
-	     && le16_to_cpu(get_unaligned(&desc->wMaxPacketSize)) !=
+	if ((desc->bmAttributes == USB_ENDPOINT_XFER_BULK &&
+	     le16_to_cpu(get_unaligned(&desc->wMaxPacketSize)) >
 	     ep_maxpacket(ep)) || !get_unaligned(&desc->wMaxPacketSize)) {
 
 		debug("%s: bad %s maxpacket\n", __func__, _ep->name);

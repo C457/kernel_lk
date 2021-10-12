@@ -106,7 +106,7 @@ struct us_data {
  */
 #define USB_MAX_XFER_BLK	65535
 #else
-#define USB_MAX_XFER_BLK	20
+#define USB_MAX_XFER_BLK	2000
 #endif
 
 static struct us_data usb_stor[USB_MAX_STOR_DEV];
@@ -664,7 +664,7 @@ static int usb_stor_BBB_transport(ccb *srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_FAILED;
 	}
 	if (!(us->flags & USB_READY))
-		mdelay(5);
+		udelay(5);
 	pipein = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
 	pipeout = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
 	/* DATA phase + error handling */

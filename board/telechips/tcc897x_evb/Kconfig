@@ -1,0 +1,12 @@
+if TCC8971_EVB
+
+config SYS_BOARD
+	default "tcc897x_evb"
+
+config SYS_VENDOR
+	default "telechips"
+
+config SYS_CONFIG_NAME
+	default "tcc8971-evb"
+
+endif

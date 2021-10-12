@@ -36,8 +36,8 @@ obj-$(CONFIG_SPL_WATCHDOG_SUPPORT) += watchdog/
 obj-$(CONFIG_SPL_USB_HOST_SUPPORT) += usb/host/
 obj-$(CONFIG_OMAP_USB_PHY) += usb/phy/
 obj-$(CONFIG_SPL_SATA_SUPPORT) += block/
-
 else
+
 
 obj-y += adc/
 obj-$(CONFIG_DM_DEMO) += demo/
@@ -65,7 +65,7 @@ obj-y += pwm/
 obj-y += input/
 # SOC specific infrastructure drivers.
 obj-y += soc/
+obj-$(CONFIG_ARCH_TELECHIPS) += usb/tcc/
 obj-$(CONFIG_REMOTEPROC) += remoteproc/
 obj-y += thermal/
-
 endif

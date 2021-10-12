@@ -33,9 +33,10 @@ obj-$(CONFIG_KONA) += kona-common/
 obj-$(CONFIG_OMAP_COMMON) += omap-common/
 obj-$(CONFIG_SYS_ARCH_TIMER) += arch_timer.o
 
-ifneq (,$(filter s5pc1xx exynos,$(SOC)))
+ifneq (,$(filter s5pc1xx exynos,$(soc)))
 obj-y += s5p-common/
 endif
+
 
 obj-$(if $(filter am33xx,$(SOC)),y) += am33xx/
 obj-$(if $(filter bcm281xx,$(SOC)),y) += bcm281xx/
@@ -52,3 +53,4 @@ obj-$(CONFIG_RMOBILE) += rmobile/
 obj-$(if $(filter stv0991,$(SOC)),y) += stv0991/
 obj-$(CONFIG_ARCH_SUNXI) += sunxi/
 obj-$(CONFIG_VF610) += vf610/
+obj-$(CONFIG_ARCH_TELECHIPS) += tcc-common/

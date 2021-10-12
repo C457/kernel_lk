@@ -21,6 +21,27 @@
 #include <part.h>
 #include <usb.h>
 
+#include <asm/arch/sdmmc/sd_bus.h>
+#ifdef CONFIG_USB_UPDATE
+#include <asm/arch/fwdn/Disk.h>
+#include <asm/arch/sfl.h>
+
+#if defined(UPDATE_DEBUG_LOG_FBCON)
+#define fbout(fmt, args...) fbprintf(fmt, ##args)
+#else
+#define fbout(fmt, args...) while (0) {}
+#endif
+
+#define DEBUG_LOG
+#ifdef DEBUG_LOG
+#define update_debug(fmt, args...) \
+		printf(fmt, ##args); \
+		fbout(fmt, ##args);
+#else
+#define update_debug(fmt, args...) while(0){}
+#endif
+int erase_emmc(unsigned long start_addr, unsigned long erase_size, int low_format);
+#endif
 #ifdef CONFIG_USB_STORAGE
 static int usb_stor_curr_dev = -1; /* current device */
 #endif
@@ -819,6 +840,317 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif /* CONFIG_USB_STORAGE */
 	return CMD_RET_USAGE;
 }
+
+#ifdef CONFIG_USB_UPDATE
+#include <fs.h>
+
+unsigned long usb_fat_read(unsigned long addr, unsigned long bytes, unsigned long pos)
+{
+	const char *filename = UPDATE_FILE_NAME;
+	loff_t len_read = 0;
+
+	if (fs_set_blk_dev("usb", "0:1", 1))
+		return 0;
+
+	if(fs_read(filename, addr, (loff_t)pos, (loff_t)bytes, (loff_t*)&len_read) < 0) {
+		update_debug("fs_read data err\n");
+		return 0;
+	}
+
+	return (unsigned long)len_read;
+}
+
+unsigned long usb_fat_read_bootloader(unsigned long addr, unsigned long bytes, unsigned long pos)
+{
+	const char *filename = UPDATE_BOOTLOADER_NAME;
+	loff_t len_read = 0;;
+
+	if (fs_set_blk_dev("usb", "0:1", 1))
+		return 0;
+
+	if(fs_read(filename, addr, pos, bytes, (loff_t*)&len_read) < 0) {
+		update_debug("fs_read data err\n");
+		return 0;
+	}
+
+	return (unsigned long)len_read;
+}
+
+#define OVER_FLOW 		1
+#define NORM_COMPLETE 	0
+
+int write_DiskImage_to_eMMC(char* fileaddr, int imageSize, unsigned int usb_offset)
+{
+	char* cur_point = fileaddr;
+	unsigned long long partSize, destAddress;
+	unsigned int offset = 0;
+	unsigned int unit_size = 0;
+	unsigned int file_size = getenv_hex("data_fai_size", 0);
+	int ret = NORM_COMPLETE;
+
+	while(imageSize > 0)
+	{
+		destAddress = 0;
+		partSize = 0;
+
+		memcpy(&destAddress, cur_point, 8);
+		cur_point += 8;
+		memcpy(&partSize, cur_point, 8);
+		cur_point += 8;
+
+		/*partition data insufficient*/
+		if( (offset + partSize + 16) > UPDATE_BUFFER_SIZE ) {
+			if(!offset){	//first data overflow
+				ret = OVER_FLOW;
+				break;
+			}
+			return offset;
+		}
+
+		imageSize -= (partSize+16);
+
+		if(partSize == 0){
+			offset += 16;
+			continue;
+		}
+
+		if(DISK_WriteSector(DISK_DEVICE_TRIFLASH, 0,
+			BYTE_TO_SECTOR(destAddress), BYTE_TO_SECTOR(partSize), cur_point))
+		{
+			update_debug("eMMC write fail\n");
+			return -1;
+		}
+
+		update_debug("\r%u/%u bytes", usb_offset + offset, file_size);
+
+		cur_point += partSize;
+		offset += (partSize + 16);
+	}
+
+	if(ret == OVER_FLOW)//offset == 0
+	{
+		usb_offset += 16;
+
+		while(partSize > 0){
+			unit_size = (unsigned int)(partSize > UPDATE_BUFFER_SIZE)?UPDATE_BUFFER_SIZE:partSize;
+
+			if(!usb_fat_read((unsigned long)fileaddr, unit_size, usb_offset)){
+				update_debug("\x1b[1;31m [SD DATA UPDATE]FAT read error!!  \x1b[0m\n");
+				return -1;
+			}
+
+			if(DISK_WriteSector(DISK_DEVICE_TRIFLASH, 0,
+				(unsigned long)BYTE_TO_SECTOR(destAddress), (unsigned long)BYTE_TO_SECTOR(unit_size), fileaddr))
+			{
+				update_debug("eMMC write fail\n");
+				return -1;
+			}
+
+			offset += unit_size;
+			usb_offset += unit_size;
+			partSize -= unit_size;
+			destAddress += unit_size;
+
+			update_debug("\r%u/%u bytes", usb_offset, file_size);
+		}
+
+		return offset+16;
+	}
+	ret = offset;
+
+	return ret;
+}
+
+char *buf_addr_for_bootloader = NULL;
+int do_usbupdate(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	char *usb_argv[6];
+	ulong loadaddr = simple_strtoul(argv[1], NULL, 16);
+	unsigned int file_size = 0;
+	unsigned int remain_data = 0;
+	unsigned int headersize = 0;
+	unsigned int offset = 0;
+	unsigned long time = 0;
+	int bootloader_size = 0;
+	buf_addr_for_bootloader = (char*)loadaddr;
+	unsigned long long dummy = 0;
+	/* int ret = -1; */
+	update_debug("bootloader buffer address(0x%08X)\n", (unsigned int)buf_addr_for_bootloader);
+	update_debug("\n=== USB update start ===\n");
+
+	/*usb initailization*/
+	usb_argv[0] = "usb";
+	usb_argv[1] = "start";
+
+	mdelay(1000); 	//for usb compatibility
+	if(do_usb(NULL, 0, 2, usb_argv)){
+		update_debug("USB init fail!\n");
+		return -1;
+	}
+
+	//for usb compatibility
+	usb_argv[1] = "part";
+	if(do_usb(NULL, 0, 2, usb_argv)){
+		update_debug("USB scan fail!\n");
+		usb_argv[1] = "start";
+		mdelay(1000);
+		update_debug("retry scan usb\n");
+		if(do_usb(NULL, 0, 2, usb_argv)){
+			update_debug("USB init fail!\n");
+			return -1;
+		}
+	}
+
+	/*get tag strings [0:7]*/
+	update_debug("\n=== prepare for update ===\n");
+	update_debug("FB Address : 0x%X\n",FB_BASE_ADDR );
+	update_debug("Check update file valid\n");
+
+	if(!usb_fat_read((unsigned long)loadaddr , 8, offset)) {
+		update_debug("[DEBUG] File is not find #1\n");
+		goto bootloader_update;
+	}
+
+	if (memcmp((char*)loadaddr, "[HEADER]", 8)){
+		//buf_addr[8] = '\0';
+		update_debug("[SD DATA UPDATE] Tag Reading Error!\n");
+		goto bootloader_update;
+	}
+	offset += 8;
+
+
+	/*get header size [8:11]*/
+	if(!usb_fat_read((unsigned long)loadaddr, 4, offset)) {
+		update_debug("[DEBUG] File is not find #2\n");
+		goto bootloader_update;
+	}
+
+	memcpy(&headersize, (char*)loadaddr, 4);
+	if(headersize != 0x60)
+	{
+		update_debug("[SD DATA UPDATE] Headersize is wrong! size = 0x%x\n",headersize);
+		goto bootloader_update;
+	}
+
+	/*check the area name*/
+	offset = 0x30;
+	if(!usb_fat_read((unsigned long)loadaddr, 7, offset)) {
+		update_debug("[DEBUG] File is not find #3\n");
+		goto bootloader_update;
+	}
+
+	if (memcmp((char*)loadaddr, "SD Data", 7)){
+		update_debug("[SD DATA UPDATE] Area name reading Error!\n");
+		goto bootloader_update;
+	}
+
+	file_size = getenv_hex("data_fai_size", 0);
+	update_debug("[SD DATA UPDATE] %s size = %u\n", UPDATE_FILE_NAME, file_size);
+	if(file_size > 0)
+	{
+		offset = 0x60;
+		remain_data = file_size - headersize;
+		time = get_timer(0);
+
+		/* remove all emmc area for update.fai update */
+		if(remain_data){
+			if( !erase_emmc(0, 0, 1) ) {
+				update_debug("Erase eMMC finished!\n");
+			} else {
+				update_debug("Erase eMMC failed...\n");
+				goto out;
+			}
+		}
+
+		//update_debug("eMMC update start !!!\n");
+		update_debug("\n=== Write SD Data(%s) ===\n", UPDATE_FILE_NAME);
+		while(remain_data>0)
+		{
+			unsigned int writen_size = 0;
+			unsigned int partial_size = (remain_data>UPDATE_BUFFER_SIZE)?UPDATE_BUFFER_SIZE:remain_data;
+
+			if(!usb_fat_read(loadaddr,partial_size,offset)){
+				update_debug("\x1b[1;31m [SD DATA UPDATE]FAT read error!!  \x1b[0m\n");
+				goto bootloader_update;
+			}
+
+			writen_size = write_DiskImage_to_eMMC((char*)loadaddr, partial_size, offset);
+			if(writen_size == -1){
+				update_debug("\x1b[1;31m [SD DATA UPDATE]failed to write!! \x1b[0m\n");
+				goto bootloader_update;
+			}
+
+			offset		+=	writen_size;
+			remain_data	-=	writen_size;
+			update_debug("\r%u/%u bytes",offset, file_size);
+		}
+		time = get_timer(time);
+		update_debug("\r%u/%u bytes\n",file_size, file_size);
+		update_debug("[SD DATA UPDATE] %d bytes update in %lu ms\n", file_size, time);
+	}
+	else
+	{
+		update_debug("[SD DATA UPDATE] There is no data(%s) file.\n", UPDATE_FILE_NAME);
+		return -1;
+	}
+
+bootloader_update:
+	bootloader_size = usb_fat_read_bootloader((unsigned long)buf_addr_for_bootloader, bootloader_size, 0);
+
+	if (bootloader_size > 0)
+	{
+		int res=0;
+		update_debug("=== Write bootloader(%s) ===\n", UPDATE_BOOTLOADER_NAME);
+		res = tcc_write("bootloader", dummy, bootloader_size, buf_addr_for_bootloader);
+		if (res < 0)
+		{
+			update_debug("[BOOTLOADER UPDATE] failed to write bootloader!\n");
+			return -1;
+		}
+	}
+	else
+	{
+		update_debug("[BOOTLOADER UPDATE] There is no bootloader(%s) file.\n", UPDATE_BOOTLOADER_NAME);
+		return -1;
+	}
+	update_debug("=== USB update complete ===\n\n");
+out:
+	return 0;
+}
+
+int usbupdate(void)
+{
+    char * argv[5];
+	int ret = 0;
+    //dcache_enable();
+    argv[1] = UPDATE_BUFFER_ADDR;
+
+	/* display proper color to check update progress */
+    if(do_usbupdate((cmd_tbl_t *)NULL,0,0, argv) < 0){
+
+		ret = -1;
+    }else{
+	}
+
+	/* notification for update succeeded */
+	if( ret == 0)
+	{
+		update_debug("Please disconnect USB connection.\n");
+	}
+
+	/* after uboot update and reset cpu */
+	do_reset(NULL, 0, 0, NULL);
+
+    return ret;
+
+}
+
+U_BOOT_CMD(
+	usbupdate,	3,	1,	do_usbupdate,
+	"update from USB device to eMMC",
+	"usbupdate [addr] [file-name]"
+);
+#endif /* CONFIG_USB_UPDATE */
 
 U_BOOT_CMD(
 	usb,	5,	1,	do_usb,

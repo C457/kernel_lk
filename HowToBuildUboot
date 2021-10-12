@@ -1,0 +1,23 @@
+Compared to D-audio/Gen5, u-boot.rom is already existed in wide platform. It means no need to build u-boot.rom every single lk build time.
+So If u-boot source files are modified, you should build u-boot only first time. Follow the below steps.
+
+case 1) 1280x720 (QXi)
+
+1. ...lk/u-boot$ make clean
+2. ...lk/u-boot$ make tcc897x-lcn_defconfig
+3. ...lk/u-boot$ make 
+4. ...lk/u-boot$ mv u-boot.rom u-boot_1280x720.rom
+
+
+case 2 ) 1920x720 (exclude QXi)
+
+1. ...lk/u-boot$ make clean
+2. ...lk/u-boot$ make tcc897x-lcn_defconfig
+3. ...lk/u-boot$ make
+4. ...lk/u-boot$ mv u-boot.rom u-boot_1920x720.rom
+
+after 4 steps being completed, you can build lk(m lk -j4).
+if you have any questions, contact  bondalee@mobis.co.kr
+
+
+

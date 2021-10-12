@@ -56,6 +56,8 @@
 #define MMC_MODE_8BIT		(1 << 3)
 #define MMC_MODE_SPI		(1 << 4)
 #define MMC_MODE_DDR_52MHz	(1 << 5)
+#define MMC_MODE_VOLCTRL	(1 << 6)
+#define MMC_MODE_HS_200MHz	(1 << 7)
 
 #define SD_DATA_4BIT	0x00040000
 
@@ -381,7 +383,9 @@ struct mmc {
 	char op_cond_pending;	/* 1 if we are waiting on an op_cond command */
 	char init_in_progress;	/* 1 if we have done mmc_start_init() */
 	char preinit;		/* start init as early as possible */
-	int ddr_mode;
+	uint ddr_mode;
+	uint volctrl;
+	uint hs200_mode;
 };
 
 struct mmc_hwpart_conf {

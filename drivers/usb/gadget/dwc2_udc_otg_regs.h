@@ -61,7 +61,25 @@ struct dwc2_usbotg_reg {
 	u32 grxstsp; /* Receive Status Debug Pop/Status Pop */
 	u32 grxfsiz; /* Receive FIFO Size */
 	u32 gnptxfsiz; /* Non-Periodic Transmit FIFO Size */
+#ifdef CONFIG_TCC
+	u32 		gnptxsts;
+	u32 		gi2cctl;	/* 0x030 */
+	u32 		gpvndctl;
+	u32 		ggpio;
+	u32 		guid;
+	u32 		gsnpsid;	/* 0x040 */
+	u32 		ghwcfg1;
+	u32 		ghwcfg2;
+	u32 		ghwcfg3;
+	u32 		ghwcfg4;	/* 0x050 */
+	u32 		glpmcfg;
+	u32 		gpwrdn;
+	u32 		gdfifocfg;
+	u32 		_pad_0x60_0x9c[40];
+	u32 		hptxfsiz;	/* 0x100 */
+#else
 	u8  res1[216];
+#endif /* CONFIG_TCC */
 	u32 dieptxf[15]; /* Device Periodic Transmit FIFO size register */
 	u8  res2[1728];
 	/* Device Configuration */
@@ -130,9 +148,15 @@ struct dwc2_usbotg_reg {
 #define HIGH_SPEED_CONTROL_PKT_SIZE	64
 #define HIGH_SPEED_BULK_PKT_SIZE	512
 
+#if defined(CONFIG_TCC897X) || defined(CONFIG_TCC898X)
+#define RX_FIFO_SIZE			0xC00
+#define NPTX_FIFO_SIZE			0xC00
+#define PTX_FIFO_SIZE			(1536*1)
+#else
 #define RX_FIFO_SIZE			(1024*4)
 #define NPTX_FIFO_SIZE			(1024*4)
 #define PTX_FIFO_SIZE			(1536*1)
+#endif
 
 #define DEPCTL_TXFNUM_0		(0x0<<22)
 #define DEPCTL_TXFNUM_1		(0x1<<22)
