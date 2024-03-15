@@ -25,20 +25,23 @@
 #ifdef CONFIG_USB_UPDATE
 #include <asm/arch/fwdn/Disk.h>
 #include <asm/arch/sfl.h>
+#include <mobis/verify_update_image.h>
 
 #if defined(UPDATE_DEBUG_LOG_FBCON)
 #define fbout(fmt, args...) fbprintf(fmt, ##args)
 #else
-#define fbout(fmt, args...) while (0) {}
+#define fbout(fmt, args...) do {} while (0)
 #endif
 
 #define DEBUG_LOG
 #ifdef DEBUG_LOG
-#define update_debug(fmt, args...) \
-		printf(fmt, ##args); \
-		fbout(fmt, ##args);
+#define update_debug(fmt, args...)		\
+	do {					\
+		printf(fmt, ##args);		\
+		fbout(fmt, ##args);		\
+	} while (0)
 #else
-#define update_debug(fmt, args...) while(0){}
+#define update_debug(fmt, args...) do {} while (0)
 #endif
 int erase_emmc(unsigned long start_addr, unsigned long erase_size, int low_format);
 #endif
@@ -847,14 +850,16 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 unsigned long usb_fat_read(unsigned long addr, unsigned long bytes, unsigned long pos)
 {
 	const char *filename = UPDATE_FILE_NAME;
+	int ret = -1;
 	loff_t len_read = 0;
 
 	if (fs_set_blk_dev("usb", "0:1", 1))
-		return 0;
+		return -1;
 
-	if(fs_read(filename, addr, (loff_t)pos, (loff_t)bytes, (loff_t*)&len_read) < 0) {
-		update_debug("fs_read data err\n");
-		return 0;
+	ret = fs_read(filename, addr, (loff_t)pos, (loff_t)bytes, (loff_t*)&len_read);
+	if (ret < 0) {
+		 update_debug("[ERROR:%s] read data ret %d \n",__func__,ret);
+		 len_read = -1;
 	}
 
 	return (unsigned long)len_read;
@@ -863,14 +868,16 @@ unsigned long usb_fat_read(unsigned long addr, unsigned long bytes, unsigned lon
 unsigned long usb_fat_read_bootloader(unsigned long addr, unsigned long bytes, unsigned long pos)
 {
 	const char *filename = UPDATE_BOOTLOADER_NAME;
-	loff_t len_read = 0;;
+	int ret = -1;
+	loff_t len_read;
 
 	if (fs_set_blk_dev("usb", "0:1", 1))
-		return 0;
+		return -1;
 
-	if(fs_read(filename, addr, pos, bytes, (loff_t*)&len_read) < 0) {
-		update_debug("fs_read data err\n");
-		return 0;
+	ret = fs_read(filename, addr, pos, bytes, (loff_t*)&len_read);
+	if (ret < 0) {
+		 update_debug("[ERROR:%s] read data ret %d \n",__func__,ret);
+		 len_read = -1;
 	}
 
 	return (unsigned long)len_read;
@@ -971,10 +978,10 @@ int do_usbupdate(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	unsigned int headersize = 0;
 	unsigned int offset = 0;
 	unsigned long time = 0;
+	int ret = -1;
 	int bootloader_size = 0;
 	buf_addr_for_bootloader = (char*)loadaddr;
 	unsigned long long dummy = 0;
-	/* int ret = -1; */
 	update_debug("bootloader buffer address(0x%08X)\n", (unsigned int)buf_addr_for_bootloader);
 	update_debug("\n=== USB update start ===\n");
 
@@ -987,7 +994,6 @@ int do_usbupdate(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		update_debug("USB init fail!\n");
 		return -1;
 	}
-
 	//for usb compatibility
 	usb_argv[1] = "part";
 	if(do_usb(NULL, 0, 2, usb_argv)){
@@ -1001,47 +1007,56 @@ int do_usbupdate(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		}
 	}
 
+#ifdef CONFIG_MOBIS_CHECK_RSA
+	update_debug("\n[%s][%d]\n",__FUNCTION__,__LINE__);
+	ret = mobis_verify_image((unsigned long)loadaddr);
+	if(ret!=0)
+	{
+		update_debug("\n=== RSA signature failed ===\n");
+		return -1;
+	}
+	update_debug("\n[%s][%d], RSA signature success!!!\n",__FUNCTION__,__LINE__);
+#endif
+
 	/*get tag strings [0:7]*/
 	update_debug("\n=== prepare for update ===\n");
-	update_debug("FB Address : 0x%X\n",FB_BASE_ADDR );
 	update_debug("Check update file valid\n");
-
-	if(!usb_fat_read((unsigned long)loadaddr , 8, offset)) {
-		update_debug("[DEBUG] File is not find #1\n");
-		goto bootloader_update;
+	
+	ret = usb_fat_read((unsigned long)loadaddr , 8, offset);
+	if (ret > 0) { 
+		if (memcmp((char*)loadaddr, "[HEADER]", 8)){
+			//buf_addr[8] = '\0';
+			update_debug("[SD DATA UPDATE] Tag Reading Error!\n");
+			return -1;
+		}
+		offset += 8;
+	} else {
+		update_debug("[DEBUG:%s] File is not find #1 \n",__func__);
 	}
-
-	if (memcmp((char*)loadaddr, "[HEADER]", 8)){
-		//buf_addr[8] = '\0';
-		update_debug("[SD DATA UPDATE] Tag Reading Error!\n");
-		goto bootloader_update;
-	}
-	offset += 8;
-
 
 	/*get header size [8:11]*/
-	if(!usb_fat_read((unsigned long)loadaddr, 4, offset)) {
-		update_debug("[DEBUG] File is not find #2\n");
-		goto bootloader_update;
-	}
-
-	memcpy(&headersize, (char*)loadaddr, 4);
-	if(headersize != 0x60)
-	{
-		update_debug("[SD DATA UPDATE] Headersize is wrong! size = 0x%x\n",headersize);
-		goto bootloader_update;
+	ret = usb_fat_read((unsigned long)loadaddr, 4, offset);
+	if (ret > 0) { 
+		memcpy(&headersize, (char*)loadaddr, 4);
+		if(headersize != 0x60)
+		{
+			update_debug("[SD DATA UPDATE] Headersize is wrong! )size = 0x%x\n",headersize);
+			return -1;
+		}
+	} else {
+		update_debug("[DEBUG:%s] File is not find #2 \n",__func__);
 	}
 
 	/*check the area name*/
 	offset = 0x30;
-	if(!usb_fat_read((unsigned long)loadaddr, 7, offset)) {
-		update_debug("[DEBUG] File is not find #3\n");
-		goto bootloader_update;
-	}
-
-	if (memcmp((char*)loadaddr, "SD Data", 7)){
-		update_debug("[SD DATA UPDATE] Area name reading Error!\n");
-		goto bootloader_update;
+	ret = usb_fat_read((unsigned long)loadaddr, 7, offset);
+	if (ret > 0) { 
+		if (memcmp((char*)loadaddr, "SD Data", 7)){
+			update_debug("[SD DATA UPDATE] Area name reading Error!\n");
+			return -1;
+		}
+	} else {
+		update_debug("[DEBUG:%s] File is not find #3 \n",__func__);
 	}
 
 	file_size = getenv_hex("data_fai_size", 0);
@@ -1093,8 +1108,9 @@ int do_usbupdate(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		update_debug("[SD DATA UPDATE] There is no data(%s) file.\n", UPDATE_FILE_NAME);
 		return -1;
 	}
-
 bootloader_update:
+
+	/* Disable to update Bootloader. 20.07.28 
 	bootloader_size = usb_fat_read_bootloader((unsigned long)buf_addr_for_bootloader, bootloader_size, 0);
 
 	if (bootloader_size > 0)
@@ -1113,6 +1129,7 @@ bootloader_update:
 		update_debug("[BOOTLOADER UPDATE] There is no bootloader(%s) file.\n", UPDATE_BOOTLOADER_NAME);
 		return -1;
 	}
+	*/
 	update_debug("=== USB update complete ===\n\n");
 out:
 	return 0;

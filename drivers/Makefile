@@ -8,6 +8,8 @@ obj-$(CONFIG_$(SPL_)LED)	+= led/
 obj-$(CONFIG_$(SPL_)PINCTRL)	+= pinctrl/
 obj-$(CONFIG_$(SPL_)RAM)	+= ram/
 
+obj-y	+= mobis/
+
 ifdef CONFIG_SPL_BUILD
 
 obj-$(CONFIG_SPL_I2C_SUPPORT) += i2c/

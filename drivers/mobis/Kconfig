@@ -1,0 +1,3 @@
+config MOBIS_CHECK_RSA
+	bool "Enable driver"
+

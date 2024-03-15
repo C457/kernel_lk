@@ -634,6 +634,7 @@ int erase_emmc_bootpartition(SD_SLOT_T *mmc, int slot_id)
 	if( mmc->ext_csd_441.SEC_COUNT )
 		boot_partition_size /= 512;
 
+	/* No Erease boot loader 20.07.28
 	while( i++ < 2 )
 	{
 		SD_BUS_switchEXTCSD( slot_id, 179, BITCSET(mmc->ext_csd_441.PARTITION_CONFIG, 0x07, i), 0);
@@ -644,6 +645,7 @@ int erase_emmc_bootpartition(SD_SLOT_T *mmc, int slot_id)
 		}
 	}
 	SD_BUS_switchEXTCSD( slot_id, 179, BITCSET(mmc->ext_csd_441.PARTITION_CONFIG, 0x07, 0x00), 0);
+	*/
 
 	debug("Boot Partition(size:0x%08lx) has been erased successfully!\n", boot_partition_size);
 	return 0;

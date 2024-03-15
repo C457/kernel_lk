@@ -40,7 +40,7 @@
 
 #define USBDEV_VTC_INCLUDE
 //#define USBDEV_MSC_INCLUDE
-#define USBDEV_FASTBOOT_INCLUDE
+//#define USBDEV_FASTBOOT_INCLUDE
 
 //===================================================================
 //

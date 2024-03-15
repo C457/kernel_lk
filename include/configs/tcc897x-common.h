@@ -21,7 +21,7 @@
 #define USE_SNOR_BOOT		1
 #endif
 
-/* #define CONFIG_USB_UPDATE */
+#define CONFIG_USB_UPDATE
 
 #define KERNEL_DEBUG		/* for kernel debugging (remove "quiet" option in the cmdline) */
 
