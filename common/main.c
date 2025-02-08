@@ -12,8 +12,21 @@
 #include <cli.h>
 #include <console.h>
 #include <version.h>
+#include <linux/ctype.h>
+#include <asm/arch/sfl.h>
+//#include <asm/arch/fwdn.h>
+#include <asm/arch/sdmmc/emmc.h>
+#include <asm/arch/partition_parser.h>
+#ifdef CONFIG_USB_UPDATE
+#include <usb.h>
+#endif
+
 
 DECLARE_GLOBAL_DATA_PTR;
+
+extern void emmc_boot_main(void);
+extern 	int check_fwdn_mode(void);
+extern 	void fwdn_start(void);
 
 /*
  * Board-specific Platform code can reimplement show_boot_progress () if needed
@@ -71,6 +84,11 @@ void main_loop(void)
 	setenv("ver", version_string);  /* set version variable */
 #endif /* CONFIG_VERSION_VARIABLE */
 
+	if(check_fwdn_mode()){
+		emmc_boot_main();
+		fwdn_start();
+	}
+
 	cli_init();
 
 	run_preboot_environment_command();
@@ -78,6 +96,15 @@ void main_loop(void)
 #if defined(CONFIG_UPDATE_TFTP)
 	update_tftp(0UL, NULL, NULL);
 #endif /* CONFIG_UPDATE_TFTP */
+
+#if defined(CONFIG_FBCON)
+	fbcon_init();
+#endif /* CONFIG_FBCON */
+
+#if defined(CONFIG_USB_UPDATE)
+	emmc_boot_main();
+	usbupdate();
+#endif
 
 	s = bootdelay_process();
 	if (cli_process_fdt(&s))

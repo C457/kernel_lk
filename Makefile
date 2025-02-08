@@ -4,7 +4,7 @@
 
 VERSION = 2016
 PATCHLEVEL = 01
-SUBLEVEL =
+SUBLEVEL = 1
 EXTRAVERSION =
 NAME =
 
@@ -737,7 +737,7 @@ DO_STATIC_RELA =
 endif
 
 # Always append ALL so that arch config.mk's can add custom ones
-ALL-y += u-boot.srec u-boot.bin System.map u-boot.cfg binary_size_check
+ALL-y += u-boot.srec u-boot.bin System.map u-boot.cfg binary_size_check u-boot.rom 
 
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
@@ -873,6 +873,14 @@ u-boot.bin: u-boot FORCE
 	$(call if_changed,objcopy)
 	$(call DO_STATIC_RELA,$<,$@,$(CONFIG_SYS_TEXT_BASE))
 	$(BOARD_SIZE_CHECK)
+
+u-boot.rom: u-boot.bin dummy.bin FORCE
+	cat dummy.bin >> u-boot.bin
+	tools/tcc_crc -o $@ -v __BL u-boot.bin
+	$(BOARD_SIZE_CHECK)
+
+dummy.bin:
+	dd if=/dev/zero of=./$@ bs=128k count=1
 
 u-boot.ldr:	u-boot
 		$(CREATE_LDR_ENV)

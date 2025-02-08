@@ -52,7 +52,9 @@ struct dwc2_core_regs {
 	u32			ghwcfg3;
 	u32			ghwcfg4;	/* 0x050 */
 	u32			glpmcfg;
-	u32			_pad_0x58_0x9c[42];
+	u32			gpwrdn;
+	u32			gdfifocfg;
+	u32			_pad_0x60_0x9c[40];
 	u32			hptxfsiz;	/* 0x100 */
 	u32			dptxfsiz_dieptxf[15];
 	u32			_pad_0x140_0x3fc[176];

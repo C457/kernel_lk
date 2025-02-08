@@ -19,6 +19,7 @@
 #include <memalign.h>
 #include <linux/list.h>
 #include <div64.h>
+#include <part.h>
 #include "mmc_private.h"
 
 static struct list_head mmc_devices;
@@ -219,6 +220,7 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 	if (mmc_send_cmd(mmc, &cmd, &data))
 		return 0;
 
+#ifndef CONFIG_MMC_SDMA
 	if (blkcnt > 1) {
 		cmd.cmdidx = MMC_CMD_STOP_TRANSMISSION;
 		cmd.cmdarg = 0;
@@ -230,6 +232,7 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 			return 0;
 		}
 	}
+#endif
 
 	return blkcnt;
 }
@@ -492,6 +495,16 @@ static int mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value)
 
 }
 
+static int mmc_set_hs200(struct mmc *mmc)
+{
+	int err = 0;
+
+	printf("try to set hs200 mode\n");
+
+	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING, 2);
+
+	return err;
+}
 static int mmc_change_freq(struct mmc *mmc)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
@@ -1216,6 +1229,9 @@ static int mmc_startup(struct mmc *mmc)
 		case 7:
 			mmc->version = MMC_VERSION_5_0;
 			break;
+		case 8:
+			mmc->version = MMC_VERSION_4_5;
+			break;
 		}
 
 		/* The partition data may be non-zero but it is only
@@ -1339,6 +1355,18 @@ static int mmc_startup(struct mmc *mmc)
 	/* Restrict card's capabilities by what the host can do */
 	mmc->card_caps &= mmc->cfg->host_caps;
 
+	if(mmc->cfg->host_caps & MMC_MODE_VOLCTRL) {
+		mmc->volctrl = 1;
+		mmc_set_ios(mmc);
+	}
+
+	if(mmc->cfg->host_caps & MMC_MODE_HS_200MHz) {
+		mmc->hs200_mode = 1;
+		err = mmc_set_hs200(mmc);
+		if (err)
+			return err;
+	}
+
 	if (IS_SD(mmc)) {
 		if (mmc->card_caps & MMC_MODE_4BIT) {
 			cmd.cmdidx = MMC_CMD_APP_CMD;
@@ -1449,12 +1477,15 @@ static int mmc_startup(struct mmc *mmc)
 
 		if (mmc->card_caps & MMC_MODE_HS) {
 			if (mmc->card_caps & MMC_MODE_HS_52MHz)
-				mmc->tran_speed = 52000000;
+				mmc->tran_speed = 50000000;
 			else
-				mmc->tran_speed = 26000000;
+				mmc->tran_speed = 25000000;
 		}
 	}
 
+	if(mmc->cfg->host_caps & MMC_MODE_HS_200MHz)
+		mmc_set_clock(mmc, 200000000);
+	else
 	mmc_set_clock(mmc, mmc->tran_speed);
 
 	/* Fix the block length for DDR mode */
@@ -1683,6 +1714,7 @@ int mmc_init(struct mmc *mmc)
 	if (!err)
 		err = mmc_complete_init(mmc);
 	debug("%s: %d, time %lu\n", __func__, err, get_timer(start));
+	print_part(&mmc->block_dev);
 	return err;
 }
 

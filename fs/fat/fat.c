@@ -279,7 +279,11 @@ get_cluster(fsdata *mydata, __u32 clustnum, __u8 *buffer, unsigned long size)
 
 	debug("gc - clustnum: %d, startsect: %d\n", clustnum, startsect);
 
+#ifdef CONFIG_USB_UPDATE
+	if (0) {
+#else
 	if ((unsigned long)buffer & (ARCH_DMA_MINALIGN - 1)) {
+#endif
 		ALLOC_CACHE_ALIGN_BUFFER(__u8, tmpbuf, mydata->sect_size);
 
 		printf("FAT: Misaligned buffer address (%p)\n", buffer);
@@ -341,6 +345,10 @@ static int get_contents(fsdata *mydata, dir_entry *dentptr, loff_t pos,
 
 	*gotsize = 0;
 	debug("Filesize: %llu bytes\n", filesize);
+
+#ifdef CONFIG_USB_UPDATE
+	setenv_hex("data_fai_size", filesize);
+#endif
 
 	if (pos >= filesize) {
 		debug("Read position past EOF: %llu\n", pos);
@@ -1326,7 +1334,7 @@ int fat_size(const char *filename, loff_t *size)
 int file_fat_read_at(const char *filename, loff_t pos, void *buffer,
 		     loff_t maxsize, loff_t *actread)
 {
-	printf("reading %s\n", filename);
+	//printf("reading %s\n", filename);
 	return do_fat_read_at(filename, pos, buffer, maxsize, LS_NO, 0,
 			      actread);
 }

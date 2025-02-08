@@ -103,6 +103,13 @@ static int setdma_rx(struct dwc2_ep *ep, struct dwc2_request *req)
 	ep->len = length;
 	ep->dma_buf = buf;
 
+	#if defined(CONFIG_TCC898X) || defined(CONFIG_TCC897X)
+	if( ((unsigned int)buf & 0xF) == 0)
+		invalidate_dcache_range((unsigned long) ep->dma_buf,
+					(unsigned long) ep->dma_buf +
+					ROUND(length, CONFIG_SYS_CACHELINE_SIZE));
+	#endif
+
 	if (ep_num == EP0_CON || length == 0)
 		pktcnt = 1;
 	else
@@ -224,12 +231,64 @@ static void complete_rx(struct dwc2_udc *dev, u8 ep_num)
 	 * For armv7, the cache_v7.c provides proper code to emit "ERROR"
 	 * message to warn users.
 	 */
+
+#ifdef DEBUG
+	{
+		unsigned int i;
+		unsigned char *buf;
+
+		printf("\x1b[1;33m[ep->dma_buf(@0x%08X)] (xfer_len: %d)", ep->dma_buf, xfer_size);
+
+		buf = (unsigned char*)ep->dma_buf;
+
+		for( i = 0; i < xfer_size; ++i){
+			if(!(i % 4))
+				printf(" ");
+
+			if(!(i % 16))
+				printf("\n");
+
+			printf("%02X", buf[i]);
+		}
+			printf("\x1b[0m\n");
+	}
+#endif
+
+
 	invalidate_dcache_range((unsigned long) ep->dma_buf,
 				(unsigned long) ep->dma_buf +
 				ROUND(xfer_size, CONFIG_SYS_CACHELINE_SIZE));
 
+
+#ifdef DEBUG
+		{
+			unsigned int i;
+			unsigned char *buf;
+
+			printf("\n\x1b[1;32m[after invalidate ep->dma_buf] (xfer_len: %d)", xfer_size);
+
+			buf = (unsigned char*)ep->dma_buf;
+
+			for( i = 0; i < xfer_size; ++i){
+				if(!(i % 4))
+					printf(" ");
+
+				if(!(i % 16))
+					printf("\n");
+
+				printf("%02X", buf[i]);
+			}
+				printf("\x1b[0m\n");
+		}
+#endif
+
 	req->req.actual += min(xfer_size, req->req.length - req->req.actual);
+
+#if defined(CONFIG_TCC897X) || defined(CONFIG_TCC898X)
+	is_short = 1;
+#else
 	is_short = (xfer_size < ep->ep.maxpacket);
+#endif
 
 	debug_cond(DEBUG_OUT_EP != 0,
 		   "%s: RX DMA done : ep = %d, rx bytes = %d/%d, "
@@ -1286,14 +1345,17 @@ static void dwc2_ep0_setup(struct dwc2_udc *dev)
 	{
 		int i, len = sizeof(*usb_ctrl);
 		char *p = (char *)usb_ctrl;
+		Printf("\x1b[1;44m");
 
-		printf("pkt = ");
+		printf("pkt =");
 		for (i = 0; i < len; i++) {
-			printf("%02x", ((u8 *)p)[i]);
-			if ((i & 7) == 7)
+
+			if(!(i % 4))
 				printf(" ");
+
+			printf("%02X", ((u8 *)p)[i]);
 		}
-		printf("\n");
+		printf("\x1b[0m\n");
 	}
 #endif
 

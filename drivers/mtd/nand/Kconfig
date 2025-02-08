@@ -6,6 +6,13 @@ config SYS_NAND_SELF_INIT
 	  This option, if enabled, provides more flexible and linux-like
 	  NAND initialization process.
 
+config NAND_TCC
+	bool "Support Telechips NAND controller"
+	select SYS_NAND_SELF_INIT
+	select CMD_NAND
+	help
+	  Enable support for the Telechips NAND controller.
+
 config NAND_DENALI
 	bool "Support Denali NAND controller"
 	select SYS_NAND_SELF_INIT

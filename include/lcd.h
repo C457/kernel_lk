@@ -47,6 +47,8 @@ void lcd_set_flush_dcache(int flush);
 #include <atmel_lcd.h>
 #elif defined(CONFIG_EXYNOS_FB)
 #include <exynos_lcd.h>
+#elif defined(CONFIG_TCC_FB)
+#include <tcc_lcd.h>
 #else
 typedef struct vidinfo {
 	ushort	vl_col;		/* Number of columns (i.e. 160) */

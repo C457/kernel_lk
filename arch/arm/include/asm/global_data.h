@@ -8,6 +8,10 @@
 #ifndef	__ASM_GBL_DATA_H
 #define __ASM_GBL_DATA_H
 
+#ifdef CONFIG_ARCH_TELECHIPS
+#include <asm/arch/global_data.h>
+#endif
+
 /* Architecture-specific global data */
 struct arch_global_data {
 #if defined(CONFIG_FSL_ESDHC)
@@ -29,6 +33,9 @@ struct arch_global_data {
 	unsigned long	plla_rate_hz;
 	unsigned long	pllb_rate_hz;
 	unsigned long	at91_pllb_usb_init;
+#endif
+#ifdef CONFIG_ARCH_TELECHIPS
+	struct tcc_global_data	tcc;
 #endif
 	/* "static data" needed by most of timer.c on ARM platforms */
 	unsigned long timer_rate_hz;

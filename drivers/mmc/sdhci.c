@@ -78,7 +78,7 @@ static int sdhci_transfer_data(struct sdhci_host *host, struct mmc_data *data,
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
 #endif
 
-	timeout = 1000000;
+	timeout = 10000000;
 	rdy = SDHCI_INT_SPACE_AVAIL | SDHCI_INT_DATA_AVAIL;
 	mask = SDHCI_DATA_AVAILABLE | SDHCI_SPACE_AVAILABLE;
 	do {
@@ -190,8 +190,12 @@ static int sdhci_send_command(struct mmc *mmc, struct mmc_cmd *cmd,
 		sdhci_writeb(host, 0xe, SDHCI_TIMEOUT_CONTROL);
 		mode = SDHCI_TRNS_BLK_CNT_EN;
 		trans_bytes = data->blocks * data->blocksize;
-		if (data->blocks > 1)
+		if (data->blocks > 1){
 			mode |= SDHCI_TRNS_MULTI;
+#ifdef CONFIG_MMC_SDMA
+			mode |= SDHCI_TRNS_ACMD12;
+#endif
+		}
 
 		if (data->flags == MMC_DATA_READ)
 			mode |= SDHCI_TRNS_READ;

@@ -61,6 +61,11 @@ config USB_STORAGE
 	  Say Y here if you want to connect USB mass storage devices to your
 	  board's USB port.
 
+config USB_FUNCTION_FASTBOOT
+	bool "Android Fastboot gadget support"
+	---help---
+	  Say Y here if you want to connect Fastboot gadget.
+
 config USB_KEYBOARD
 	bool "USB Keyboard support"
 	---help---

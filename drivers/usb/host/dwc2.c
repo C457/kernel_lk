@@ -217,6 +217,10 @@ static void dwc_otg_core_host_init(struct dwc2_core_regs *regs)
 				CONFIG_DWC2_HOST_NPERIO_TX_FIFO_SIZE) <<
 				DWC2_FIFOSIZE_STARTADDR_OFFSET;
 		writel(ptxfifosize, &regs->hptxfsiz);
+
+		#ifndef CONFIG_TCC897X_REV_XX
+		writel(0x0FC01000, &regs->gdfifocfg);	// for TCC897x AX chip
+		#endif
 	}
 #endif
 
@@ -288,6 +292,10 @@ static void dwc_otg_core_init(struct dwc2_core_regs *regs)
 	usbcfg |= DWC2_GUSBCFG_TERM_SEL_DL_PULSE;
 #else
 	usbcfg &= ~DWC2_GUSBCFG_TERM_SEL_DL_PULSE;
+#endif
+
+#if defined(CONFIG_TCC897X) || defined(CONFIG_TCC898X)
+	usbcfg |= DWC2_GUSBCFG_FORCEHOSTMODE;
 #endif
 	writel(usbcfg, &regs->gusbcfg);
 
@@ -830,9 +838,33 @@ int chunk_msg(struct dwc2_priv *priv, struct usb_device *dev,
 			flush_dcache_range((unsigned long)priv->aligned_buffer,
 				(unsigned long)((void *)priv->aligned_buffer +
 				roundup(xfer_len, ARCH_DMA_MINALIGN)));
-		}
+			#ifdef DEBUG
+			{
+				unsigned int i;
 
-		writel(phys_to_bus((unsigned long)priv->aligned_buffer),
+				printk("\x1b[1;33m[OUT DATA] (xfer_len: %d)", xfer_len);
+				for( i = 0; i < xfer_len; ++i){
+					if(!(i % 4))
+						printf(" ");
+
+					if(!(i % 16))
+						printf("\n");
+
+					printf("%02x", priv->aligned_buffer[i]);
+				}
+					printf("\x1b[0m\n");
+			}
+			#endif
+		}
+#ifdef DEBUG
+		else{
+			memset(priv->aligned_buffer, 0x5A, xfer_len);
+			flush_dcache_range((unsigned long)priv->aligned_buffer,
+				(unsigned long)((void *)priv->aligned_buffer +
+				roundup(xfer_len, ARCH_DMA_MINALIGN)));
+		}
+#endif
+		writel( phys_to_bus((unsigned long)priv->aligned_buffer),
 		       &hc_regs->hcdma);
 
 		/* Set host channel enable after all other setup is complete. */
@@ -853,6 +885,26 @@ int chunk_msg(struct dwc2_priv *priv, struct usb_device *dev,
 				roundup(xfer_len, ARCH_DMA_MINALIGN)));
 
 			memcpy(buffer + done, priv->aligned_buffer, xfer_len);
+
+			#ifdef DEBUG
+			{
+				unsigned int i;
+
+				printk("\x1b[38;31m[IN DATA] (xfer_len: %d)", xfer_len);
+				for( i = 0; i < xfer_len; ++i){
+					if(!(i % 4))
+						printf(" ");
+
+					if(!(i % 16))
+						printf("\n");
+
+					printf("%02x", priv->aligned_buffer[i]);
+				}
+
+				printf("\x1b[0m\n");
+			}
+			#endif
+
 			if (sub)
 				stop_transfer = 1;
 		}

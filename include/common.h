@@ -87,6 +87,10 @@ typedef volatile unsigned char	vu_char;
 #include <flash.h>
 #include <image.h>
 
+#if defined(CONFIG_FBCON)
+#include <fbcon/fbcon.h>
+#endif /* CONFIG_FBCON */
+
 /* Bring in printf format macros if inttypes.h is included */
 #define __STDC_FORMAT_MACROS
 

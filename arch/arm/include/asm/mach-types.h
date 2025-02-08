@@ -1107,6 +1107,7 @@ extern unsigned int __machine_arch_type;
 #define MACH_TYPE_COLIBRI_T30          4493
 #define MACH_TYPE_APALIS_T30           4513
 #define MACH_TYPE_OMAPL138_LCDK        2495
+#define MACH_TYPE_TCC897X 	       5014
 
 #ifdef CONFIG_ARCH_EBSA110
 # ifdef machine_arch_type
@@ -14186,6 +14187,18 @@ extern unsigned int __machine_arch_type;
 # define machine_is_apalis_t30()	(machine_arch_type == MACH_TYPE_APALIS_T30)
 #else
 # define machine_is_apalis_t30()	(0)
+#endif
+
+#ifdef CONFIG_MACH_TCC897X
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type __machine_arch_type
+# else
+#  define machine_arch_type MACH_TYPE_TCC897X
+# endif
+# define machine_is_tcc897x()   (machine_arch_type == MACH_TYPE_TCC897X)
+#else
+# define machine_is_tcc897x()	(0)
 #endif
 
 /*

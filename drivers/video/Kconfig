@@ -257,4 +257,6 @@ config VIDEO_TEGRA124
 
 source "drivers/video/bridge/Kconfig"
 
+source "drivers/video/tcc/Kconfig"
+
 endmenu

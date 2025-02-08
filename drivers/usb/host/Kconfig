@@ -34,6 +34,12 @@ config USB_OHCI_GENERIC
 	---help---
 	  Enables support for generic OHCI controller.
 
+config USB_DWC2
+	bool "DWC2 Host (USB2.0) support"
+	depends on TCC897X 
+	---help---
+	  Enables support for DWC_OTG Host USB controller.
+
 config USB_EHCI_HCD
 	bool "EHCI HCD (USB 2.0) support"
 	---help---

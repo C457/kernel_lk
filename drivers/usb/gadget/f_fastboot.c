@@ -64,8 +64,7 @@ static struct usb_endpoint_descriptor fs_ep_in = {
 	.bDescriptorType    = USB_DT_ENDPOINT,
 	.bEndpointAddress   = USB_DIR_IN,
 	.bmAttributes       = USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize     = TX_ENDPOINT_MAXIMUM_PACKET_SIZE,
-	.bInterval          = 0x00,
+	.wMaxPacketSize     = cpu_to_le16(64),
 };
 
 static struct usb_endpoint_descriptor fs_ep_out = {
@@ -73,8 +72,15 @@ static struct usb_endpoint_descriptor fs_ep_out = {
 	.bDescriptorType	= USB_DT_ENDPOINT,
 	.bEndpointAddress	= USB_DIR_OUT,
 	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize		= RX_ENDPOINT_MAXIMUM_PACKET_SIZE_1_1,
-	.bInterval		= 0x00,
+	.wMaxPacketSize		= cpu_to_le16(64),
+};
+
+static struct usb_endpoint_descriptor hs_ep_in = {
+	.bLength		= USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType	= USB_DT_ENDPOINT,
+	.bEndpointAddress	= USB_DIR_IN,
+	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize		= cpu_to_le16(512),
 };
 
 static struct usb_endpoint_descriptor hs_ep_out = {
@@ -82,8 +88,7 @@ static struct usb_endpoint_descriptor hs_ep_out = {
 	.bDescriptorType	= USB_DT_ENDPOINT,
 	.bEndpointAddress	= USB_DIR_OUT,
 	.bmAttributes		= USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize		= RX_ENDPOINT_MAXIMUM_PACKET_SIZE_2_0,
-	.bInterval		= 0x00,
+	.wMaxPacketSize		= cpu_to_le16(512),
 };
 
 static struct usb_interface_descriptor interface_desc = {
@@ -97,9 +102,15 @@ static struct usb_interface_descriptor interface_desc = {
 	.bInterfaceProtocol	= FASTBOOT_INTERFACE_PROTOCOL,
 };
 
-static struct usb_descriptor_header *fb_runtime_descs[] = {
+static struct usb_descriptor_header *fb_fs_function[] = {
 	(struct usb_descriptor_header *)&interface_desc,
 	(struct usb_descriptor_header *)&fs_ep_in,
+	(struct usb_descriptor_header *)&fs_ep_out,
+};
+
+static struct usb_descriptor_header *fb_hs_function[] = {
+	(struct usb_descriptor_header *)&interface_desc,
+	(struct usb_descriptor_header *)&hs_ep_in,
 	(struct usb_descriptor_header *)&hs_ep_out,
 	NULL,
 };
@@ -177,7 +188,15 @@ static int fastboot_bind(struct usb_configuration *c, struct usb_function *f)
 		return -ENODEV;
 	f_fb->out_ep->driver_data = c->cdev;
 
+	f->descriptors = fb_fs_function;
+
+	if (gadget_is_dualspeed(gadget)) {
+		/* Assume endpoint addresses are the same for both speeds */
+		hs_ep_in.bEndpointAddress = fs_ep_in.bEndpointAddress;
 	hs_ep_out.bEndpointAddress = fs_ep_out.bEndpointAddress;
+		/* copy HS descriptors */
+		f->hs_descriptors = fb_hs_function;
+	}
 
 	s = getenv("serial#");
 	if (s)
@@ -302,7 +321,6 @@ static int fastboot_add(struct usb_configuration *c)
 	}
 
 	f_fb->usb_function.name = "f_fastboot";
-	f_fb->usb_function.hs_descriptors = fb_runtime_descs;
 	f_fb->usb_function.bind = fastboot_bind;
 	f_fb->usb_function.unbind = fastboot_unbind;
 	f_fb->usb_function.set_alt = fastboot_set_alt;
@@ -382,7 +400,7 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 
 	strsep(&cmd, ":");
 	if (!cmd) {
-		error("missing variable\n");
+		error("missing variable");
 		fastboot_tx_write_str("FAILmissing var");
 		return;
 	}
@@ -413,7 +431,7 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 		else
 			strcpy(response, "FAILValue not set");
 	} else {
-		error("unknown variable: %s\n", cmd);
+		printf("WARNING: unknown variable: %s\n", cmd);
 		strcpy(response, "FAILVariable not implemented");
 	}
 	fastboot_tx_write_str(response);
@@ -477,7 +495,7 @@ static void rx_handler_dl_image(struct usb_ep *ep, struct usb_request *req)
 		req->complete = rx_handler_command;
 		req->length = EP_BUFFER_SIZE;
 
-		sprintf(response, "OKAY");
+		strcpy(response, "OKAY");
 		fastboot_tx_write_str(response);
 
 		printf("\ndownloading of %d bytes finished\n", download_bytes);
@@ -506,10 +524,10 @@ static void cb_download(struct usb_ep *ep, struct usb_request *req)
 	printf("Starting download of %d bytes\n", download_size);
 
 	if (0 == download_size) {
-		sprintf(response, "FAILdata invalid size");
+		strcpy(response, "FAILdata invalid size");
 	} else if (download_size > CONFIG_FASTBOOT_BUF_SIZE) {
 		download_size = 0;
-		sprintf(response, "FAILdata too large");
+		strcpy(response, "FAILdata too large");
 	} else {
 		sprintf(response, "DATA%08x", download_size);
 		req->complete = rx_handler_dl_image;
@@ -561,7 +579,7 @@ static void cb_flash(struct usb_ep *ep, struct usb_request *req)
 
 	strsep(&cmd, ":");
 	if (!cmd) {
-		error("missing partition name\n");
+		error("missing partition name");
 		fastboot_tx_write_str("FAILmissing partition name");
 		return;
 	}
@@ -683,7 +701,7 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 	}
 
 	if (!func_cb) {
-		error("unknown command: %s\n", cmdbuf);
+		error("unknown command: %s", cmdbuf);
 		fastboot_tx_write_str("FAILunknown command");
 	} else {
 		if (req->actual < req->length) {
@@ -691,7 +709,7 @@ static void rx_handler_command(struct usb_ep *ep, struct usb_request *req)
 			buf[req->actual] = 0;
 			func_cb(ep, req);
 		} else {
-			error("buffer overflow\n");
+			error("buffer overflow");
 			fastboot_tx_write_str("FAILbuffer overflow");
 		}
 	}

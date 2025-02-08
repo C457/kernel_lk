@@ -19,6 +19,10 @@
 #define CONFIG_FASTBOOT_GPT_NAME GPT_ENTRY_NAME
 #endif
 
+#ifndef CONFIG_BOOTLOADER_PARTITION_NAME
+#define CONFIG_BOOTLOADER_PARTITION_NAME	""
+#endif
+
 static char *response_str;
 
 struct fb_mmc_sparse {
@@ -97,6 +101,12 @@ static void write_raw_image(block_dev_desc_t *dev_desc, disk_partition_t *info,
 	fastboot_okay(response_str, "");
 }
 
+__weak int fb_mmc_update_bootloader(void *buffer, unsigned int bytes,
+				    int partition)
+{
+	return -EINVAL;
+}
+
 void fb_mmc_flash_write(const char *cmd, unsigned int session_id,
 			void *download_buffer, unsigned int download_bytes,
 			char *response)
@@ -133,6 +143,31 @@ void fb_mmc_flash_write(const char *cmd, unsigned int session_id,
 		fastboot_okay(response_str, "");
 		return;
 	} else if (get_partition_info_efi_by_name_or_alias(dev_desc, cmd, &info)) {
+		/*
+		 * If partition name is fake bootloader name,
+		 * update bootloader using vendor specific function.
+		 */
+		if (strcmp(cmd, CONFIG_BOOTLOADER_PARTITION_NAME) == 0) {
+			int err;
+
+			printf("updating bootloader 0\n");
+			err = fb_mmc_update_bootloader(download_buffer,
+					download_bytes, 0);
+			if (!err) {
+				printf("updating bootloader 1\n");
+				err = fb_mmc_update_bootloader(download_buffer,
+					download_bytes, 1);
+			}
+			if (err) {
+				fastboot_fail(response_str,
+					"failed to update bootloader");
+				return;
+			} else {
+				printf("........ success\n");
+				fastboot_okay(response_str, "");
+			}
+			return;
+		}
 		error("cannot find partition: '%s'\n", cmd);
 		fastboot_fail(response_str, "cannot find partition");
 		return;
